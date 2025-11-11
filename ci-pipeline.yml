@@ -1,0 +1,45 @@
+trigger:
+  branches:
+    include: [ main ]
+
+variables:
+  GCP_PROJECT: 'your-gcp-project'
+  GAR_REGION: 'us-central1'   # choose region
+  GAR_REPO: 'webapp-images'   # matches terraform repo_id
+  IMAGE_TAG: '$(Build.BuildId)'
+
+stages:
+- stage: BuildAndPush
+  jobs:
+  - job: Build
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: DownloadSecureFile@1
+      name: gcpKey
+      inputs:
+        secureFile: 'gcp-service-account.json'   # upload in pipeline library
+
+    - script: |
+        echo "Install gcloud"
+        sudo apt-get update -y
+        sudo apt-get install -y google-cloud-sdk
+      displayName: 'Install gcloud'
+
+    - script: |
+        gcloud auth activate-service-account --key-file=$(gcpKey.secureFilePath)
+        gcloud config set project $(GCP_PROJECT)
+        gcloud auth configure-docker $(GAR_REGION)-docker.pkg.dev --quiet
+      displayName: 'Authenticate gcloud & configure-docker'
+
+    - script: |
+        # Build backend image
+        docker build -t $(GAR_REGION)-docker.pkg.dev/$(GCP_PROJECT)/$(GAR_REPO)/backend:$(IMAGE_TAG) ./backend
+        docker push $(GAR_REGION)-docker.pkg.dev/$(GCP_PROJECT)/$(GAR_REPO)/backend:$(IMAGE_TAG)
+
+        # Build frontend image
+        docker build -t $(GAR_REGION)-docker.pkg.dev/$(GCP_PROJECT)/$(GAR_REPO)/frontend:$(IMAGE_TAG) ./frontend
+        docker push $(GAR_REGION)-docker.pkg.dev/$(GCP_PROJECT)/$(GAR_REPO)/frontend:$(IMAGE_TAG)
+
+        # Option: push mysql image if custom (usually use official)
+      displayName: 'Build & Push images'

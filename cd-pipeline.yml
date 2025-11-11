@@ -1,0 +1,46 @@
+trigger: none
+pr: none
+resources:
+  pipelines:
+  - pipeline: CI          # name used below
+    source: BuildAndPush  # name of your CI pipeline
+    trigger: true
+
+variables:
+  GCP_PROJECT: 'your-gcp-project'
+  GAR_REGION: 'us-central1'
+  GAR_REPO: 'webapp-images'
+  IMAGE_TAG: $[ resources.pipeline.CI.outputs['BuildAndPush.Build.BuildId'] ] # example
+
+stages:
+- stage: Deploy
+  jobs:
+  - job: HelmDeploy
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: DownloadSecureFile@1
+      name: gcpKey
+      inputs:
+        secureFile: 'gcp-service-account.json'
+
+    - script: |
+        sudo apt-get update -y
+        sudo apt-get install -y google-cloud-sdk
+      displayName: 'Install gcloud'
+
+    - script: |
+        gcloud auth activate-service-account --key-file=$(gcpKey.secureFilePath)
+        gcloud container clusters get-credentials webapp-cluster --zone us-central1-a --project $(GCP_PROJECT)
+        # configure docker auth so helm (if pulling OCI) and kubectl can pull images
+        gcloud auth configure-docker $(GAR_REGION)-docker.pkg.dev --quiet
+      displayName: 'Auth and get kubeconfig'
+
+    - script: |
+        helm repo add webapp-helm oci://$(GAR_REGION)-docker.pkg.dev/$(GCP_PROJECT)/$(GAR_REPO) || true
+        # if using chart in repo/ocirepo or local chart:
+        helm upgrade --install webapp ./helm-chart \
+          --set backend.image="$(GAR_REGION)-docker.pkg.dev/$(GCP_PROJECT)/$(GAR_REPO)/backend:$(IMAGE_TAG)" \
+          --set frontend.image="$(GAR_REGION)-docker.pkg.dev/$(GCP_PROJECT)/$(GAR_REPO)/frontend:$(IMAGE_TAG)" \
+          --namespace webapp --create-namespace
+      displayName: 'Helm upgrade/install'
