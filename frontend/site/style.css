@@ -1,0 +1,13 @@
+body {
+  font-family: Arial, sans-serif;
+  max-width: 900px;
+  margin: 24px auto;
+  padding: 12px;
+  color: #222;
+}
+
+header { text-align: center; }
+
+#list ul { list-style: none; padding: 0; }
+#list li { padding: 8px 12px; border-bottom: 1px solid #eee; display:flex; justify-content:space-between; }
+button { cursor: pointer; }

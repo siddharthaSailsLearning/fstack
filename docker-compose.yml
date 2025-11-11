@@ -1,0 +1,56 @@
+version: "3.9"
+
+services:
+  db:
+    build: ./db
+    container_name: webapp_db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: appdb
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: apppass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - my_Nodejs_nginx_mysql_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uappuser", "-papppass"]
+      interval: 10s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: backend
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: appuser
+      DB_PASSWORD: apppass
+      DB_NAME: appdb
+    networks:
+      - my_Nodejs_nginx_mysql_network
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+  frontend:
+    build: ./frontend
+    container_name: webapp_frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    networks:
+      - my_Nodejs_nginx_mysql_network
+
+volumes:
+  mysql-data:
+
+networks:
+  my_Nodejs_nginx_mysql_network:
+    driver: bridge
+

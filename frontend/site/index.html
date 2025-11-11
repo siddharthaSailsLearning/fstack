@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Simple WebApp</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Simple WebApp</h1>
+    <p>Frontend (Nginx) → Backend (Node.js) → MySQL (Persistant olume)</p>
+  </header>
+
+  <main>
+    <section id="create">
+      <h2>Add item</h2>
+      <input id="itemText" placeholder="Item text" />
+      <button id="addBtn">Add</button>
+    </section>
+
+    <section id="list">
+      <h2>Items</h2>
+      <ul id="items"></ul>
+    </section>
+
+    <section id="health">
+      <h2>Health</h2>
+      <button id="healthBtn">Check Health</button>
+      <div id="healthResult"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
