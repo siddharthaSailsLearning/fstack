@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "webapp.fullname" . }}-frontend
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: nginx
+        image: {{ .Values.image.repository }}/frontend:{{ .Values.image.tag }}
+        ports:
+        - containerPort: {{ .Values.frontend.port }}
+        # Proxy to backend via service
+        env:
+        - name: BACKEND_URL
+          value: "http://{{ include "webapp.fullname" . }}-backend:{{ .Values.backend.port }}"

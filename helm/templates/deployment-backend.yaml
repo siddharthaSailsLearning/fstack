@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "webapp.fullname" . }}-backend
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - name: backend
+        image: {{ .Values.image.repository }}/backend:{{ .Values.image.tag }}
+        ports:
+        - containerPort: {{ .Values.backend.port }}
+        envFrom:
+        - secretRef:
+            name: {{ include "webapp.fullname" . }}-db-secret
+        - configMapRef:
+            name: {{ include "webapp.fullname" . }}-config
+        readinessProbe:  # Simulate depends_on healthy
+          httpGet:
+            path: /health  # Assume Java app has /health
+            port: {{ .Values.backend.port }}
+          initialDelaySeconds: 60  # Wait for DB
+      initContainers:  # Enforce DB readiness
+      - name: wait-db
+        image: busybox
+        command: ['sh', '-c', 'until nc -z db {{ .Values.db.port }}; do echo waiting for db; sleep 2; done;']

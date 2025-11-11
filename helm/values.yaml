@@ -1,0 +1,22 @@
+replicaCount: 1
+image:
+  repository: gcr.io/my-webapp-project/webapp-images  # From GAR output
+  tag: "latest"  # Dynamic from pipeline
+  pullPolicy: IfNotPresent
+db:
+  rootPassword: root
+  database: appdb
+  user: appuser
+  password: apppass
+  port: 3306
+backend:
+  port: 3000
+  dbHost: db  # Service name
+frontend:
+  port: 80
+service:
+  type: LoadBalancer  # For frontend external access
+  port: 80
+persistence:
+  enabled: true
+  size: 5Gi

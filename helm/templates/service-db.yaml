@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "webapp.fullname" . }}-db
+spec:
+  selector:
+    app: db
+  ports:
+  - port: {{ .Values.db.port }}
+    targetPort: {{ .Values.db.port }}
+  clusterIP: None  # Headless for StatefulSet

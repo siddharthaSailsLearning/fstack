@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "webapp.fullname" . }}-db
+spec:
+  serviceName: {{ include "webapp.fullname" . }}-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+      - name: mysql
+        image: {{ .Values.image.repository }}/mysql:{{ .Values.image.tag }}  # Or mysql:8.0 official
+        ports:
+        - containerPort: {{ .Values.db.port }}
+        envFrom:
+        - secretRef:
+            name: {{ include "webapp.fullname" . }}-db-secret
+        - configMapRef:
+            name: {{ include "webapp.fullname" . }}-config
+        volumeMounts:
+        - name: mysql-data
+          mountPath: /var/lib/mysql
+        readinessProbe:  # From compose healthcheck
+          exec:
+            command: ["mysqladmin", "ping", "-h", "localhost", "-uappuser", "-papppass"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          failureThreshold: 5
+      volumes:
+      - name: mysql-data
+        persistentVolumeClaim:
+          claimName: {{ include "webapp.fullname" . }}-mysql-pvc
