@@ -8,4 +8,4 @@ spec:
   ports:
   - port: {{ .Values.db.port }}
     targetPort: {{ .Values.db.port }}
-  clusterIP: None  # Headless for StatefulSet
+  clusterIP: None  

@@ -9,7 +9,7 @@ terraform {
 }
 
 provider "google" {
-  credentials = var.gcp_sa_key  # From Azure DevOps var
+  credentials = var.gcp_sa_key  
   project     = var.project_id
-  region      = var.region      # e.g., "us-central1"
+  region      = var.location      
 }

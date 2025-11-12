@@ -6,11 +6,92 @@ trigger:
     include:
     - terraform/*
 
+variables:
+- group: terraform-fstack-vars  
+
 pool:
   vmImage: 'ubuntu-latest'
 
-variables:
-- group: gcp-creds  # GCP keys
+
+stages:
+- stage: Backend_bucket_check
+  displayName: 'Backet: ensure GCS backend bucket exists'
+  jobs:
+  - job: Backent_check
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: DownloadSecureFile@1
+      name: download_sa
+      inputs:
+        secureFile: $(SERVICE_ACCOUNT_SECUREFILE)
+
+    - task: Bash@3
+      displayName: 'Install gcloud and create backend bucket if not present'
+      env:
+        GOOGLE_APPLICATION_CREDENTIALS: $(Agent.TempDirectory)/$(SERVICE_ACCOUNT_SECUREFILE)
+      inputs:
+        targetType: 'inline'
+        script: |
+          set -euo pipefail
+          echo "PATH: $PATH"
+          echo "Creds file: $GOOGLE_APPLICATION_CREDENTIALS"
+
+          if ! command -v gcloud >/dev/null 2>&1; then
+            curl -sSL https://sdk.cloud.google.com | bash >/dev/null 2>&1 || true
+            export PATH="$HOME/google-cloud-sdk/bin:$PATH"
+          fi
+          gcloud --quiet version || true
+          gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS"
+          gcloud config set project $(PROJECT_ID)
+
+          if ! gsutil ls -b gs://$(GCS_BACKEND_BUCKET) >/dev/null 2>&1; then
+            echo "Creating bucket: $(GCS_BACKEND_BUCKET)"
+            gsutil mb -p $(PROJECT_ID) -l $(LOCATION) gs://$(GCS_BACKEND_BUCKET)
+            gsutil versioning set on gs://$(GCS_BACKEND_BUCKET)
+            echo "Bucket created and versioning enabled."
+          else
+            echo "Bucket exists; setting versioning on (idempotent)."
+            gsutil versioning set on gs://$(GCS_BACKEND_BUCKET) || true
+          fi
+
+    - task: Bash@3
+      displayName: 'Install Terraform'
+      desc
+      inputs:
+        targetType: 'inline'
+        script: |
+          set -euo pipefail
+          if ! command -v terraform >/dev/null 2>&1; then
+            wget https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -O /tmp/terraform.zip
+            unzip -o /tmp/terraform.zip -d /usr/local/bin
+          fi
+          terraform version
+
+    - task: Bash@3
+      displayName: 'Terraform init & plan (writes plan file)'
+      env:
+        GOOGLE_APPLICATION_CREDENTIALS: $(Agent.TempDirectory)/$(SERVICE_ACCOUNT_SECUREFILE)
+      inputs:
+        targetType: 'inline'
+        script: |
+          set -euo pipefail
+          export GCS_BACKEND_BUCKET="$(GCS_BACKEND_BUCKET)"
+          export BUCKET_PREFIX="$(BUCKET_PREFIX)"
+          export PROJECT_ID="$(PROJECT_ID)"
+          export LOCATION="$(LOCATION)"
+          export TERRAFORM_WORKING_DIR="$(TERRAFORM_WORKING_DIR)"
+
+          cd "$TERRAFORM_WORKING_DIR"
+          export TF_VAR_project_id="$PROJECT_ID"
+          export TF_VAR_region="$LOCATION"
+          
+          echo "Backend bucket: $GCS_BACKEND_BUCKET"
+          terraform init -backend-config="bucket=$GCS_BACKEND_BUCKET" -backend-config="prefix=$BUCKET_PREFIX"
+          terraform validate
+          terraform plan -out=tfplan.binary -input=false
+          terraform show -no-color tfplan.binary > tfplan.txt
+          echo "Plan written successfully."
 
 stages:
 - stage: Plan
@@ -22,7 +103,7 @@ stages:
         terraformVersion: '1.0.0'
     - task: TerraformTaskV4@4
       inputs:
-        provider: 'azurerm'  # But use google provider
+        provider: 'google'  # But use google provider
         command: 'init'
         workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
         backendServiceArm: 'terraform-state'  # Optional remote state
@@ -54,7 +135,7 @@ stages:
           steps:
           - task: TerraformTaskV4@4
             inputs:
-              command: 'apply'
+              command: '$(COMMAND)'
               workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
               environmentServiceNameAzureRM: 'gcp-auth'
               commandOptions: '-auto-approve'
