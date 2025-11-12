@@ -2,15 +2,15 @@ trigger: none
 pr: none
 resources:
   pipelines:
-  - pipeline: CI          # name used below
-    source: BuildAndPush  # name of your CI pipeline
+  - pipeline: CD-pipeline-java-helm-app
+    source: BuildAndPush  
     trigger: true
 
 variables:
   GCP_PROJECT: 'your-gcp-project'
   GAR_REGION: 'us-central1'
   GAR_REPO: 'webapp-images'
-  IMAGE_TAG: $[ resources.pipeline.CI.outputs['BuildAndPush.Build.BuildId'] ] # example
+  IMAGE_TAG: $[ resources.pipeline.CI.outputs['BuildAndPush.Build.BuildId'] ] 
 
 stages:
 - stage: Deploy
